@@ -49,8 +49,9 @@ export async function createRenderer(type, container) {
 }
 
 function createWebGLRenderer() {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
     const renderer = new THREE.WebGLRenderer({
-        antialias: true,
+        antialias: !isMobile, // Disable on mobile to save bandwidth
         powerPreference: 'high-performance',
         alpha: false,
     });
@@ -60,7 +61,9 @@ function createWebGLRenderer() {
 
 /** Apply production-quality settings to a renderer */
 function applyProductionSettings(renderer) {
-    const pr = Math.min(window.devicePixelRatio, 2);
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+    // Hard cap mobile to 1.0 to avoid 3K/4K scaling crashes
+    const pr = Math.min(window.devicePixelRatio, isMobile ? 1.0 : 2);
     renderer.setPixelRatio(pr);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;

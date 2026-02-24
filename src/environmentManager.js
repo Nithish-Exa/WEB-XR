@@ -105,9 +105,8 @@ export class EnvironmentManager {
         light1.penumbra = 0.5;
         light1.decay = 2;
         light1.distance = 20;
-        light1.castShadow = true;
-        light1.shadow.mapSize.set(1024, 1024);
-        light1.name = 'envLight';
+        light1.castShadow = false; // Primary light in SceneManager handles shadows
+        light1.name = 'envLight_Aux';
         this.scene.add(light1);
         this.envObjects.push(light1);
 
@@ -115,7 +114,7 @@ export class EnvironmentManager {
         light2.position.set(-5, 6, -2);
         light2.decay = 2;
         light2.distance = 15;
-        light2.name = 'envLight';
+        light2.name = 'envLight_Aux';
         this.scene.add(light2);
         this.envObjects.push(light2);
 
@@ -123,7 +122,7 @@ export class EnvironmentManager {
         light3.position.set(5, 5, 2);
         light3.decay = 2;
         light3.distance = 15;
-        light3.name = 'envLight';
+        light3.name = 'envLight_Aux';
         this.scene.add(light3);
         this.envObjects.push(light3);
 
@@ -163,7 +162,12 @@ export class EnvironmentManager {
         const sun = new THREE.DirectionalLight(0xfffbe8, 2.0);
         sun.position.set(10, 15, 8);
         sun.castShadow = true;
-        sun.shadow.mapSize.set(2048, 2048);
+
+        // Optimisation for budget mobile devices
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+        const shadowRes = isMobile ? 512 : 2048;
+        sun.shadow.mapSize.set(shadowRes, shadowRes);
+
         sun.shadow.camera.near = 0.5;
         sun.shadow.camera.far = 60;
         sun.shadow.camera.left = -15;
@@ -297,14 +301,18 @@ export class EnvironmentManager {
     /** Clear all environment objects */
     _clearEnvironment() {
         this.envObjects.forEach((obj) => {
-            this.scene.remove(obj);
-            if (obj.geometry) obj.geometry.dispose();
-            if (obj.material) {
-                if (Array.isArray(obj.material)) {
-                    obj.material.forEach(m => m.dispose());
-                } else {
-                    obj.material.dispose();
+            try {
+                this.scene.remove(obj);
+                if (obj.geometry) obj.geometry.dispose();
+                if (obj.material) {
+                    if (Array.isArray(obj.material)) {
+                        obj.material.forEach(m => { if (m) m.dispose(); });
+                    } else {
+                        obj.material.dispose();
+                    }
                 }
+            } catch (err) {
+                console.warn('Silent failure during environment object disposal:', err);
             }
         });
         this.envObjects = [];

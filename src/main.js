@@ -65,6 +65,17 @@ class App {
                 this.isXRPresenting = true;
                 this.uiManager.hide();
                 this.statsManager.hide();
+
+                // Advanced VR Performance: Request Fixed Foveated Rendering
+                const session = this.renderer.xr.getSession();
+                if (session) {
+                    if (session.requestFixedFoveation) session.requestFixedFoveation(1.0);
+                    if (session.updateTargetFrameRate) session.updateTargetFrameRate(90);
+                }
+
+                // Optimization: Disable tonemapping in VR to save GPU fill-rate
+                this.renderer.toneMapping = THREE.NoToneMapping;
+
                 // Reduce pixel ratio for VR perf
                 this.renderer.setPixelRatio(1);
 
@@ -80,6 +91,10 @@ class App {
                 this.uiManager.show();
                 this.statsManager.show();
                 this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+                // Restore tonemapping for Desktop
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
                 // Reset spawn position
                 if (this.sceneManager.xrRig) {
                     this.sceneManager.xrRig.position.set(0, 0, 0);
@@ -175,6 +190,8 @@ class App {
         const cameraState = this.sceneManager.getCameraState();
 
         // Stop loop and dispose
+        // IMPORTANT: Dispose environment first to avoid WebGPU dangling listener errors
+        this.envManager.dispose();
         disposeRenderer(this.renderer);
 
         // Create new renderer
@@ -200,11 +217,21 @@ class App {
 
         // XR events
         // XR events
+        // XR events
         if (this.renderer.xr.addEventListener) {
             this.renderer.xr.addEventListener('sessionstart', () => {
                 this.isXRPresenting = true;
                 this.uiManager.hide();
                 this.statsManager.hide();
+
+                // Advanced VR Performance: Request Fixed Foveated Rendering
+                const session = this.renderer.xr.getSession();
+                if (session) {
+                    if (session.requestFixedFoveation) session.requestFixedFoveation(1.0);
+                    if (session.updateTargetFrameRate) session.updateTargetFrameRate(90);
+                }
+
+                this.renderer.toneMapping = THREE.NoToneMapping;
                 this.renderer.setPixelRatio(1);
 
                 // Offset spawn position so user starts in front of the bike
@@ -218,6 +245,10 @@ class App {
                 this.uiManager.show();
                 this.statsManager.show();
                 this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+                // Restore tonemapping for Desktop
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
                 // Reset spawn position
                 if (this.sceneManager.xrRig) {
                     this.sceneManager.xrRig.position.set(0, 0, 0);

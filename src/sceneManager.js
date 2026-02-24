@@ -55,7 +55,7 @@ export class SceneManager {
         key.name = 'defaultKey';
         key.position.set(5, 8, 5);
         key.castShadow = true;
-        key.shadow.mapSize.set(1024, 1024);
+        key.shadow.mapSize.set(512, 512); // Reduced from 1024 for 90 FPS perf
         key.shadow.camera.near = 0.5;
         key.shadow.camera.far = 50;
         key.shadow.camera.left = -10;
@@ -106,8 +106,8 @@ export class SceneManager {
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
 
-        // Center model at origin
-        model.position.sub(center);
+        // Position model so its bottom is at y=0 (on the floor)
+        model.position.set(-center.x, -center.y + size.y / 2, -center.z);
 
         // Auto-scale if too large (target max dimension ~3 units)
         const maxDim = Math.max(size.x, size.y, size.z);
@@ -116,12 +116,24 @@ export class SceneManager {
             model.scale.setScalar(scale);
         }
 
-        // Enable frustum culling, shadows
+        // Efficient Shadow Management:
+        // 1. Disable bike self-shadowing (saves many draw calls in VR)
+        // 2. Disable shadows for very small objects (bolts/detail)
         model.traverse((child) => {
             if (child.isMesh) {
                 child.frustumCulled = true;
-                child.castShadow = true;
-                child.receiveShadow = true;
+
+                // Only cast shadows for reasonably sized meshes (> 100 triangles)
+                const triangleCount = child.geometry.attributes.position.count / 3;
+                if (triangleCount > 100) {
+                    child.castShadow = true;
+                } else {
+                    child.castShadow = false;
+                }
+
+                // Optimization: Usually bikes don't need to receive shadows from themselves
+                // in a studio setup—this saves a significant amount of "shadow map read" time.
+                child.receiveShadow = false;
 
                 // Ensure proper material settings
                 if (child.material) {
@@ -134,8 +146,28 @@ export class SceneManager {
             }
         });
 
-        // Point camera at model
-        this.camera.lookAt(0, size.y * 0.3, 0);
+        // Tighten shadow frustum for maximum quality vs performance
+        this._updateShadowFrustum(box);
+
+        // Point camera at center of bike
+        this.camera.lookAt(0, size.y * 0.5, 0);
+    }
+
+    _updateShadowFrustum(box) {
+        const key = this.scene.getObjectByName('defaultKey');
+        if (!key || !key.shadow) return;
+
+        // Auto-fit shadow camera to the model's bounding box
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+
+        key.shadow.camera.left = -maxDim;
+        key.shadow.camera.right = maxDim;
+        key.shadow.camera.top = maxDim * 1.5;
+        key.shadow.camera.bottom = -maxDim;
+        key.shadow.camera.near = 0.5;
+        key.shadow.camera.far = maxDim * 10;
+        key.shadow.camera.updateProjectionMatrix();
     }
 
     /** Attach OrbitControls for desktop */
