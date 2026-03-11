@@ -14,14 +14,30 @@ export async function createRenderer(
     if (type === "webgpu") {
         const webgpuSupported = await WebGPUEngine.IsSupportedAsync;
         if (webgpuSupported) {
-            engine = new WebGPUEngine(canvas);
+            engine = new WebGPUEngine(canvas, {
+                antialias: true,
+                powerPreference: "high-performance"
+            });
             await (engine as WebGPUEngine).initAsync();
         } else {
-            console.warn("WebGPU not supported on this browser, falling back to WebGL.");
-            engine = new Engine(canvas, true);
+            engine = new Engine(canvas, true, { 
+                powerPreference: "high-performance",
+                stencil: true // Keep stencil for pipeline safety
+            });
         }
     } else {
-        engine = new Engine(canvas, true);
+        engine = new Engine(canvas, true, { 
+            powerPreference: "high-performance",
+            stencil: true
+        });
+    }
+
+    engine.enableOfflineSupport = false;
+
+    // Performance Optimization: Limit hardware scaling ratio on high-DPI displays (like mobiles)
+    if (window.devicePixelRatio > 1.2) {
+        // Lowering to 1.2x cap for even better performance on WebGL
+        engine.setHardwareScalingLevel(window.devicePixelRatio / 1.2);
     }
 
     return { engine, canvas };

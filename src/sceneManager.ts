@@ -1,34 +1,48 @@
-import { Scene, SceneLoader, AbstractEngine } from "@babylonjs/core";
+import { Scene, SceneLoader, AbstractEngine, DefaultRenderingPipeline, ImageProcessingConfiguration } from "@babylonjs/core";
 import "@babylonjs/loaders/glTF";
 import { WebXRDefaultExperience } from "@babylonjs/core/XR/webXRDefaultExperience";
 
 export async function setupScene(engine: AbstractEngine): Promise<Scene> {
     const scene = new Scene(engine);
+    
+    // Performance Optimization: Disable pointer picking on move
+    scene.skipPointerMovePicking = true;
+
     return scene;
 }
 
 export async function loadModel(scene: Scene, modelUrl: string): Promise<void> {
     await SceneLoader.ImportMeshAsync("", modelUrl, "", scene);
     
-    // Automatically frame the model WITHOUT normalizing scale
+    // Automatically frame the model
     scene.createDefaultCameraOrLight(true, true, true);
     
-    // Remove the default light created by createDefaultCameraOrLight
-    // as we rely on environmentManager for lighting
+    const activeCamera = scene.activeCamera;
+    if (activeCamera) {
+        activeCamera.attachControl(scene.getEngine().getRenderingCanvas()!, true);
+        if ('wheelPrecision' in activeCamera) {
+             (activeCamera as any).wheelPrecision = 50;
+        }
+
+        // Attach Rendering Pipeline to the newly created camera
+        const defaultPipeline = new DefaultRenderingPipeline("default", true, scene, [activeCamera]);
+        defaultPipeline.imageProcessingEnabled = true;
+        defaultPipeline.imageProcessing.toneMappingEnabled = true;
+        defaultPipeline.imageProcessing.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;
+        defaultPipeline.imageProcessing.exposure = 1.0;
+        defaultPipeline.imageProcessing.contrast = 1.1;
+        defaultPipeline.bloomEnabled = true;
+        defaultPipeline.bloomThreshold = 0.9;
+        defaultPipeline.bloomWeight = 0.2;
+        defaultPipeline.bloomKernel = 16;
+    }
+
+    // Remove the default light
     scene.lights.slice().forEach(light => {
         if (light.name === "default light") {
             light.dispose();
         }
     });
-
-    // Ensure camera controls are attached and adjust precision for large models
-    const bjsCamera = scene.activeCamera;
-    if (bjsCamera) {
-        bjsCamera.attachControl(scene.getEngine().getRenderingCanvas()!, true);
-        if ('wheelPrecision' in bjsCamera) {
-             (bjsCamera as any).wheelPrecision = 50;
-        }
-    }
 }
 
 export async function setupXRControllers(scene: Scene): Promise<WebXRDefaultExperience | null> {
