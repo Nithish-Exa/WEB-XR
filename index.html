@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebXR 3D Model Viewer</title>
+    <style>
+      body, html {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: #000;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
+      #app {
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
+      /* Full screen canvas */
+      canvas {
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+        outline: none;
+        display: block;
+      }
+      #loading-screen {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: #111;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        font-size: 24px;
+        z-index: 100;
+      }
+      .spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid rgba(255,255,255,0.3);
+        border-radius: 50%;
+        border-top-color: #007bff;
+        animation: spin 1s ease-in-out infinite;
+        margin-bottom: 20px;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      #ui-layer {
+        position: absolute;
+        top: 20px; right: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        z-index: 10;
+        background: rgba(20, 20, 20, 0.8);
+        padding: 20px;
+        border-radius: 12px;
+        color: white;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        backdrop-filter: blur(5px);
+        min-width: 150px;
+      }
+      .ui-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .ui-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #aaa;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      button {
+        padding: 10px 15px;
+        cursor: pointer;
+        background: #333;
+        color: white;
+        border: 2px solid transparent;
+        border-radius: 6px;
+        font-size: 14px;
+        transition: all 0.2s;
+        font-weight: 500;
+      }
+      button:hover { background: #444; }
+      button.active { 
+        background: #007bff; 
+        border-color: #0056b3; 
+        box-shadow: 0 0 10px rgba(0,123,255,0.5);
+      }
+      hr {
+        width: 100%;
+        border: none;
+        border-top: 1px solid #444;
+        margin: 5px 0;
+      }
+      #stats-overlay {
+        position: absolute;
+        top: 20px; left: 20px;
+        z-index: 10;
+        color: #00ff00;
+        background: rgba(0,0,0,0.7);
+        padding: 15px;
+        border-radius: 8px;
+        font-family: monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        backdrop-filter: blur(5px);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="loading-screen">
+        <div class="spinner"></div>
+        <div>Loading WebXR Engine...</div>
+      </div>
+      <div id="stats-overlay"></div>
+      <div id="ui-layer"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
