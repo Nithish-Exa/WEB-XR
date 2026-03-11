@@ -1,111 +1,118 @@
-import { AbstractEngine } from "@babylonjs/core";
+/**
+ * main.ts
+ * Application entry point — wires managers and handles the 120fps render loop.
+ */
+
+import { SceneManager } from "./sceneManager";
+import { EnvironmentManager } from "./environmentManager";
 import { createRenderer } from "./rendererManager";
-import { setupScene, loadModel, setupXRControllers } from "./sceneManager";
-import { setEnvironment } from "./environmentManager";
 import { setupUI, AppState } from "./uiManager";
-import { updateStats } from "./statsManager";
+import { StatsManager } from "./statsManager";
 
-const state: AppState = {
-    renderer: "webgl",
-    environment: "studio",
-};
+class App {
+    private sceneManager!: SceneManager;
+    private envManager!: EnvironmentManager;
+    private statsManager: StatsManager = new StatsManager();
+    private state: AppState = {
+        renderer: "webgl",
+        environment: "studio",
+        xrSupported: false
+    };
 
-let currentEngine: AbstractEngine | null = null;
-let xrExperience: any = null; // Store XR experience globally for easy access
+    constructor() {}
 
-async function init() {
-    const appContainer = document.getElementById("app")!;
-    const loadingScreen = document.getElementById("loading-screen")!;
+    public async init(): Promise<void> {
+        const container = document.getElementById("app") || document.body;
 
-    loadingScreen.style.display = "flex";
-    loadingScreen.innerHTML = `
-        <div class="spinner"></div>
-        <div>Loading WebXR Engine...</div>
-    `;
+        // 1. Initial Renderer Setup
+        const { engine } = await createRenderer(this.state.renderer, container);
+        
+        // 2. Initialize Managers
+        this.sceneManager = new SceneManager(engine);
+        this.envManager = new EnvironmentManager(this.sceneManager.scene);
+        this.statsManager.init();
 
-    // 6. Proper engine disposal when switching renderer
-    if (currentEngine) {
-        currentEngine.stopRenderLoop();
-        currentEngine.dispose();
-        const oldCanvas = document.getElementById("renderCanvas");
-        if (oldCanvas) {
-            oldCanvas.remove();
+        // 3. XR Support Detection
+        this.state.xrSupported = navigator.xr ? await navigator.xr.isSessionSupported("immersive-vr") : false;
+
+        // 4. Initial Environment & Model
+        await this.envManager.setEnvironment(this.state.environment, engine.description === "WebGPU");
+        await this.sceneManager.loadModel("/models/RTR-310-op-v4.glb", (msg) => {
+            console.log(msg);
+            // Optional: update a loading UI here
+        });
+
+        // Ensure shadow casters are updated after model load
+        this.envManager.updateShadowCasters();
+
+        // 5. Setup UI
+        this._updateUI();
+
+        // 6. Hide loading screen
+        const loadingScreen = document.getElementById("loading-screen");
+        if (loadingScreen) {
+            loadingScreen.style.opacity = "0";
+            loadingScreen.style.transition = "opacity 0.5s ease-out";
+            setTimeout(() => loadingScreen.remove(), 500);
         }
-        currentEngine = null;
+
+        // 7. 120fps Optimized Render Loop
+        engine.runRenderLoop(() => {
+            this.sceneManager.update();
+            this.sceneManager.scene.render();
+            if (this.statsManager) this.statsManager.update(engine);
+        });
+
+        // Resize handler
+        window.addEventListener("resize", () => this.sceneManager.resize());
     }
 
-    try {
-        // 1. Initialize renderer
-        const { engine } = await createRenderer(state.renderer, appContainer);
-        currentEngine = engine;
+    private _updateUI(): void {
+        setupUI(
+            this.state,
+            (r) => this._switchRenderer(r),
+            (e) => this._switchEnvironment(e),
+            () => this.sceneManager.setupXR()
+        );
+    }
 
-        // 8. Engine resize
-        window.addEventListener("resize", () => {
-            if (currentEngine) currentEngine.resize();
-        });
+    private async _switchRenderer(type: "webgl" | "webgpu"): Promise<void> {
+        if (this.state.renderer === type) return;
+        
+        // Save current camera target/alpha/beta if needed
+        const prevCamera = {
+            alpha: this.sceneManager.camera.alpha,
+            beta: this.sceneManager.camera.beta,
+            radius: this.sceneManager.camera.radius,
+            target: this.sceneManager.camera.target.clone()
+        };
 
-        // 2. Initialize scene
-        const scene = await setupScene(engine);
+        this.state.renderer = type;
+        
+        // Dispose old engine and canvas
+        const oldEngine = this.sceneManager.scene.getEngine();
+        const oldCanvas = oldEngine.getRenderingCanvas();
+        oldEngine.dispose();
+        if (oldCanvas) oldCanvas.remove();
 
-        // 3. Load model (do not normalize model scale)
-        loadingScreen.innerHTML = `
-            <div class="spinner"></div>
-            <div>Loading GLB Model...</div>
-        `;
-        await loadModel(scene, "models/RTR-310-op-v4.glb");
+        // Re-initialize with new engine
+        await this.init();
 
-        // Initialize environment
-        setEnvironment(scene, state.environment);
+        // Restore camera
+        this.sceneManager.camera.alpha = prevCamera.alpha;
+        this.sceneManager.camera.beta = prevCamera.beta;
+        this.sceneManager.camera.radius = prevCamera.radius;
+        this.sceneManager.camera.setTarget(prevCamera.target);
+    }
 
-        // 4. XR support
-        xrExperience = await setupXRControllers(scene);
-        state.xrSupported = xrExperience !== null;
-
-        // UI Binding function
-        function bindUI() {
-            setupUI(state,
-                async (newRenderer: "webgl" | "webgpu") => {
-                    if (state.renderer === newRenderer) return;
-                    state.renderer = newRenderer;
-                    await init(); // Rebuild everything when renderer changes
-                },
-                (newEnv: "studio" | "outdoor") => {
-                    if (state.environment === newEnv) return;
-                    state.environment = newEnv;
-                    setEnvironment(scene, state.environment);
-                    bindUI(); // Refresh UI state
-                },
-                async () => {
-                    if (xrExperience) {
-                        try {
-                            await xrExperience.baseExperience.enterXRAsync("immersive-vr", "local-floor");
-                        } catch (e) {
-                            console.error("Error entering XR:", e);
-                        }
-                    }
-                }
-            );
-        }
-        bindUI();
-
-        loadingScreen.style.display = "none";
-
-        // 5. Start render loop
-        engine.runRenderLoop(() => {
-            scene.render();
-            updateStats(engine, scene);
-        });
-
-    } catch (e) {
-        console.error("Initialization error:", e);
-        loadingScreen.innerHTML = `
-            <div style="color: #ff4444; text-align: center;">
-                <h2>Error Starting Viewer</h2>
-                <p>${e}</p>
-            </div>
-        `;
+    private async _switchEnvironment(type: "studio" | "outdoor"): Promise<void> {
+        this.state.environment = type;
+        const isWebGPU = this.sceneManager.scene.getEngine().description === "WebGPU";
+        await this.envManager.setEnvironment(type, isWebGPU);
+        this._updateUI();
     }
 }
 
-// Start application
-init();
+// Global initialization
+const app = new App();
+app.init().catch(console.error);
