@@ -260,6 +260,11 @@ export class UIManager {
         document.getElementById('chk-rotate').addEventListener('change', (e) => {
             if (this.callbacks.onRotateChange) this.callbacks.onRotateChange(e.target.checked);
         });
+
+        if (window.innerWidth <= 600) {
+            document.getElementById('ui-body').classList.add('collapsed');
+            document.getElementById('ui-collapse').textContent = '+';
+        }
     }
 
     /** Register callbacks */

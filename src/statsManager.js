@@ -119,6 +119,9 @@ export class StatsManager {
             body.classList.toggle('collapsed');
             btn.textContent = body.classList.contains('collapsed') ? '+' : '−';
         });
+
+        document.getElementById('stats-body').classList.add('collapsed');
+        document.getElementById('stats-toggle').textContent = '+';
     }
 
     /** Call every frame */

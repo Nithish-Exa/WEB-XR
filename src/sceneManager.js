@@ -9,14 +9,17 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-const MODEL_PATH = '/models/RTR-310-op-v4.glb';
+const MODEL_PATH = '/models/Ronine.glb';
 const DRACO_DECODER_PATH = 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/';
+const isMobileDevice = () =>
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+    window.innerWidth <= 768;
 
 export class SceneManager {
     constructor() {
         this.scene = new THREE.Scene();
-        this.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 500);
-        this.camera.position.set(3, 2, 5);
+        this.camera = new THREE.PerspectiveCamera(40, 1, 0.1, 500);
+        this.camera.position.set(-2.25, 1.28, 2.65);
 
         // XR Rig for proper positioning and teleportation
         this.xrRig = new THREE.Group();
@@ -45,31 +48,73 @@ export class SceneManager {
     }
 
     _setupLighting() {
-        // Ambient
-        const ambient = new THREE.AmbientLight(0xffffff, 0.4);
-        ambient.name = 'defaultAmbient';
-        this.scene.add(ambient);
+        const hemi = new THREE.HemisphereLight(0xe9f2ff, 0x181512, 0.42);
+        hemi.name = 'defaultAmbient';
+        this.scene.add(hemi);
 
-        // Key light
-        const key = new THREE.DirectionalLight(0xffffff, 1.2);
+        const ambientLift = new THREE.AmbientLight(0xfff6e8, 0.1);
+        ambientLift.name = 'ambientLift';
+        this.scene.add(ambientLift);
+
+        const shadowRes = isMobileDevice() ? 1024 : 2048;
+
+        const key = new THREE.DirectionalLight(0xfff8ed, 2.35);
         key.name = 'defaultKey';
-        key.position.set(5, 8, 5);
+        key.position.set(-4, 7, 4.5);
         key.castShadow = true;
-        key.shadow.mapSize.set(512, 512); // Reduced from 1024 for 90 FPS perf
+        key.shadow.mapSize.set(shadowRes, shadowRes);
         key.shadow.camera.near = 0.5;
         key.shadow.camera.far = 50;
         key.shadow.camera.left = -10;
         key.shadow.camera.right = 10;
         key.shadow.camera.top = 10;
         key.shadow.camera.bottom = -10;
-        key.shadow.bias = -0.0001;
+        key.shadow.bias = -0.00008;
+        key.shadow.normalBias = 0.025;
+        key.shadow.radius = 4;
+        key.target.position.set(0, 0.8, 0);
         this.scene.add(key);
+        this.scene.add(key.target);
 
-        // Fill light
-        const fill = new THREE.DirectionalLight(0xb4c6e0, 0.5);
+        const fill = new THREE.DirectionalLight(0xbcd7ff, 0.72);
         fill.name = 'defaultFill';
-        fill.position.set(-3, 4, -3);
+        fill.position.set(4, 4, -3);
+        fill.target.position.set(0, 0.8, 0);
         this.scene.add(fill);
+        this.scene.add(fill.target);
+
+        const rim = new THREE.DirectionalLight(0xffe1bd, 1.5);
+        rim.name = 'defaultRim';
+        rim.position.set(-4.5, 3.5, -5);
+        rim.target.position.set(0, 0.7, 0);
+        this.scene.add(rim);
+        this.scene.add(rim.target);
+
+        const topLights = [
+            { position: [-2.4, 4.8, 1.7], intensity: 70, color: 0xfff7e9, angle: 0.48 },
+            { position: [0.1, 5.2, 0.1], intensity: 92, color: 0xffffff, angle: 0.58 },
+            { position: [2.8, 4.5, -1.4], intensity: 56, color: 0xddeaff, angle: 0.5 },
+        ];
+
+        topLights.forEach((cfg, index) => {
+            const light = new THREE.SpotLight(cfg.color, cfg.intensity);
+            light.name = `topSoftbox_${index + 1}`;
+            light.position.set(...cfg.position);
+            light.angle = cfg.angle;
+            light.penumbra = 0.84;
+            light.decay = 2;
+            light.distance = 9;
+            light.target.position.set(0, 0.75, 0);
+            light.castShadow = index === 1 && !isMobileDevice();
+            if (light.castShadow) {
+                light.shadow.mapSize.set(1024, 1024);
+                light.shadow.bias = -0.00008;
+                light.shadow.normalBias = 0.02;
+                light.shadow.radius = 4;
+            }
+            this.scene.add(light);
+            this.scene.add(light.target);
+        });
     }
 
     _initLoader() {
@@ -101,56 +146,109 @@ export class SceneManager {
     }
 
     _processModel(model) {
-        // Compute bounding box and center
-        const box = new THREE.Box3().setFromObject(model);
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
+        const sourceBox = new THREE.Box3().setFromObject(model);
+        const sourceSize = sourceBox.getSize(new THREE.Vector3());
+        const sourceMaxDim = Math.max(sourceSize.x, sourceSize.y, sourceSize.z);
+        const targetMaxDim = 3.0;
 
-        // Position model so its bottom is at y=0 (on the floor)
-        model.position.set(-center.x, -center.y + size.y / 2, -center.z);
-
-        // Auto-scale if too large (target max dimension ~3 units)
-        const maxDim = Math.max(size.x, size.y, size.z);
-        if (maxDim > 5) {
-            const scale = 3 / maxDim;
-            model.scale.setScalar(scale);
+        if (sourceMaxDim > 0) {
+            model.scale.setScalar(targetMaxDim / sourceMaxDim);
         }
 
-        // Efficient Shadow Management:
-        // 1. Disable bike self-shadowing (saves many draw calls in VR)
-        // 2. Disable shadows for very small objects (bolts/detail)
+        const scaledBox = new THREE.Box3().setFromObject(model);
+        const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
+        model.position.set(
+            model.position.x - scaledCenter.x,
+            model.position.y - scaledBox.min.y,
+            model.position.z - scaledCenter.z
+        );
+
+        // Preserve product-render depth while skipping tiny shadow casters.
         model.traverse((child) => {
             if (child.isMesh) {
                 child.frustumCulled = true;
 
-                // Only cast shadows for reasonably sized meshes (> 100 triangles)
+                // Tiny details receive shadows but do not need to cast them.
                 const triangleCount = child.geometry.attributes.position.count / 3;
-                if (triangleCount > 100) {
-                    child.castShadow = true;
-                } else {
-                    child.castShadow = false;
-                }
+                child.castShadow = triangleCount > 50;
 
-                // Optimization: Usually bikes don't need to receive shadows from themselves
-                // in a studio setup—this saves a significant amount of "shadow map read" time.
-                child.receiveShadow = false;
+                child.receiveShadow = true;
+
+                if (child.geometry && !child.geometry.attributes.normal) {
+                    child.geometry.computeVertexNormals();
+                }
 
                 // Ensure proper material settings
                 if (child.material) {
-                    if (Array.isArray(child.material)) {
-                        child.material.forEach(m => { m.envMapIntensity = 1.0; });
-                    } else {
-                        child.material.envMapIntensity = 1.0;
-                    }
+                    const materials = Array.isArray(child.material) ? child.material : [child.material];
+                    materials.forEach((mat) => this._polishMaterial(mat, child.name));
                 }
             }
         });
 
-        // Tighten shadow frustum for maximum quality vs performance
-        this._updateShadowFrustum(box);
+        const finalBox = new THREE.Box3().setFromObject(model);
+        this._updateShadowFrustum(finalBox);
 
         // Point camera at center of bike
-        this.camera.lookAt(0, size.y * 0.5, 0);
+        const finalSize = finalBox.getSize(new THREE.Vector3());
+        this._setPresentationCamera();
+        this.camera.lookAt(0, finalSize.y * 0.55, 0);
+        if (this.controls) {
+            this.controls.target.set(0, finalSize.y * 0.52, 0);
+            this.controls.update();
+        }
+    }
+
+    _setPresentationCamera() {
+        const aspect = window.innerWidth / Math.max(window.innerHeight, 1);
+        if (aspect < 0.8) {
+            this.camera.position.set(-4.55, 1.85, 5.35);
+            return;
+        }
+
+        this.camera.position.set(-2.25, 1.28, 2.65);
+    }
+
+    _polishMaterial(material, meshName = '') {
+        if (!material) return;
+
+        material.envMapIntensity = Math.max(material.envMapIntensity ?? 1, 1.65);
+
+        if (material.isMeshStandardMaterial || material.isMeshPhysicalMaterial) {
+            const name = `${material.name || ''} ${meshName}`.toLowerCase();
+            const looksRubber = /rubber|tyre|tire|grip|seat|leather|saddle/.test(name);
+            const looksGlass = /glass|screen|lens|visor|windshield/.test(name);
+            const looksPaint =
+                /paint|body|tank|panel|cover|fairing|fender|mudguard|red|yellow|blue|white/.test(name);
+            const looksMetal =
+                !looksRubber &&
+                ((material.metalness ?? 0) > 0.55 ||
+                    /metal|chrome|steel|alum|alloy|fork|rim|disc|brake|exhaust|engine|bolt|screw/.test(name));
+
+            if (looksRubber) {
+                material.metalness = Math.min(material.metalness ?? 0, 0.08);
+                material.roughness = Math.max(material.roughness ?? 0.72, 0.64);
+                material.envMapIntensity = Math.min(material.envMapIntensity, 0.9);
+            } else if (looksGlass) {
+                material.roughness = Math.min(material.roughness ?? 0.12, 0.16);
+                material.envMapIntensity = 2.1;
+            } else if (looksMetal) {
+                material.metalness = Math.max(material.metalness ?? 0, 0.82);
+                material.roughness = THREE.MathUtils.clamp(material.roughness ?? 0.28, 0.16, 0.38);
+                material.envMapIntensity = 2.5;
+            } else if (looksPaint) {
+                material.metalness = THREE.MathUtils.clamp(material.metalness ?? 0.35, 0.12, 0.65);
+                material.roughness = THREE.MathUtils.clamp(material.roughness ?? 0.3, 0.18, 0.38);
+                material.envMapIntensity = Math.max(material.envMapIntensity, 2.05);
+            }
+
+            if ('clearcoat' in material && looksPaint) {
+                material.clearcoat = Math.max(material.clearcoat ?? 0, 0.72);
+                material.clearcoatRoughness = Math.min(material.clearcoatRoughness ?? 0.16, 0.2);
+            }
+        }
+
+        material.needsUpdate = true;
     }
 
     _updateShadowFrustum(box) {
@@ -178,7 +276,7 @@ export class SceneManager {
         this.controls = new OrbitControls(this.camera, renderer.domElement);
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.05;
-        this.controls.target.set(0, 0.5, 0);
+        this.controls.target.set(0, 0.7, 0);
         this.controls.minDistance = 1;
         this.controls.maxDistance = 20;
         this.controls.maxPolarAngle = Math.PI * 0.85;
@@ -326,7 +424,7 @@ export class SceneManager {
     getCameraState() {
         return {
             position: this.camera.position.clone(),
-            target: this.controls ? this.controls.target.clone() : new THREE.Vector3(0, 0.5, 0),
+            target: this.controls ? this.controls.target.clone() : new THREE.Vector3(0, 0.7, 0),
         };
     }
 
