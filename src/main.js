@@ -169,14 +169,14 @@ class App {
       transform: translateX(-50%);
       z-index: 100;
       padding: 12px 28px;
-      background: rgba(0, 212, 255, 0.15);
-      border: 1px solid #00d4ff;
-      color: #00d4ff;
+      background: rgba(14, 14, 13, 0.88);
+      border: 1px solid rgba(232, 177, 91, 0.72);
+      color: #e8b15b;
       font-family: 'Segoe UI', system-ui, sans-serif;
       font-size: 14px;
       font-weight: 600;
       letter-spacing: 1px;
-      border-radius: 8px;
+      border-radius: 4px;
       cursor: pointer;
       backdrop-filter: blur(8px);
     `;
