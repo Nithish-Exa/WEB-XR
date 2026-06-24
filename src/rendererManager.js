@@ -74,7 +74,7 @@ function applyProductionSettings(renderer) {
 
     if (renderer.shadowMap) {
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.shadowMap.type = THREE.VSMShadowMap;
     }
 }
 
