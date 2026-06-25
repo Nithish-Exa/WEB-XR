@@ -5,6 +5,12 @@
 
 import * as THREE from 'three';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import {
     createRenderer,
     disposeRenderer,
@@ -17,10 +23,49 @@ import { EnvironmentManager } from './environmentManager.js';
 import { UIManager } from './uiManager.js';
 import { StatsManager } from './statsManager.js';
 
+const ColorGradeShader = {
+    uniforms: {
+        tDiffuse: { value: null },
+        contrast: { value: 1.05 },
+        saturation: { value: 1.03 },
+        vignetteStrength: { value: 0.12 },
+        vignetteRadius: { value: 0.78 },
+    },
+    vertexShader: `
+        varying vec2 vUv;
+        void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    `,
+    fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform float contrast;
+        uniform float saturation;
+        uniform float vignetteStrength;
+        uniform float vignetteRadius;
+        varying vec2 vUv;
+
+        void main() {
+            vec4 texel = texture2D(tDiffuse, vUv);
+            vec3 color = texel.rgb;
+            float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+            color = mix(vec3(luma), color, saturation);
+            color = (color - 0.5) * contrast + 0.5;
+            float dist = distance(vUv, vec2(0.5));
+            float vignette = smoothstep(vignetteRadius, 0.34, dist);
+            color *= mix(1.0 - vignetteStrength, 1.0, vignette);
+            gl_FragColor = vec4(max(color, vec3(0.0)), texel.a);
+        }
+    `,
+};
+
 class App {
     constructor() {
         this.container = document.getElementById('app');
         this.renderer = null;
+        this.composer = null;
+        this.postPasses = [];
         this.vrButton = null;
         this.sceneManager = new SceneManager();
         this.envManager = new EnvironmentManager(this.sceneManager.scene);
@@ -46,6 +91,7 @@ class App {
 
         // Controls
         this.sceneManager.setupControls(this.renderer);
+        this._setupPostProcessing();
 
         // UI
         this.uiManager.init(this.container, { webgpuAvailable: webgpuOk });
@@ -78,6 +124,7 @@ class App {
 
                 // Reduce pixel ratio for VR perf
                 this.renderer.setPixelRatio(1);
+                this._resizePostProcessing();
 
                 // Offset spawn position so user starts in front of the bike
                 if (this.sceneManager.xrRig) {
@@ -91,6 +138,7 @@ class App {
                 this.uiManager.show();
                 this.statsManager.show();
                 this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this._resizePostProcessing();
 
                 // Restore tonemapping for Desktop
                 this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -144,7 +192,11 @@ class App {
 
         this.sceneManager.update(delta);
         this.statsManager.update(this.renderer);
-        this.renderer.render(this.sceneManager.scene, this.sceneManager.camera);
+        if (this._shouldUsePostProcessing()) {
+            this.composer.render(delta);
+        } else {
+            this.renderer.render(this.sceneManager.scene, this.sceneManager.camera);
+        }
     }
 
     _onResize() {
@@ -154,6 +206,86 @@ class App {
         if (this.renderer) {
             this.renderer.setSize(w, h);
         }
+        this._resizePostProcessing();
+    }
+
+    _setupPostProcessing() {
+        this._disposePostProcessing();
+
+        if (!this.renderer || this.renderer._rendererType !== 'webgl') return;
+
+        const width = Math.max(this.container.clientWidth, 1);
+        const height = Math.max(this.container.clientHeight, 1);
+        const composer = new EffectComposer(this.renderer);
+        const renderPass = new RenderPass(
+            this.sceneManager.scene,
+            this.sceneManager.camera
+        );
+
+        const ssaoPass = new SSAOPass(
+            this.sceneManager.scene,
+            this.sceneManager.camera,
+            width,
+            height,
+            32
+        );
+        ssaoPass.kernelRadius = 0.42;
+        ssaoPass.minDistance = 0.0025;
+        ssaoPass.maxDistance = 0.14;
+        ssaoPass.output = SSAOPass.OUTPUT.Default;
+
+        const bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(width, height),
+            0.065,
+            0.32,
+            0.92
+        );
+
+        const colorGradePass = new ShaderPass(ColorGradeShader);
+        const outputPass = new OutputPass();
+
+        composer.addPass(renderPass);
+        composer.addPass(ssaoPass);
+        composer.addPass(bloomPass);
+        composer.addPass(colorGradePass);
+        composer.addPass(outputPass);
+
+        this.composer = composer;
+        this.postPasses = [renderPass, ssaoPass, bloomPass, colorGradePass, outputPass];
+        this._resizePostProcessing();
+    }
+
+    _resizePostProcessing() {
+        if (!this.composer) return;
+
+        const width = Math.max(this.container.clientWidth, 1);
+        const height = Math.max(this.container.clientHeight, 1);
+        const isMobile =
+            /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+            window.innerWidth <= 768;
+        const pixelRatio = Math.min(window.devicePixelRatio, isMobile ? 1 : 2);
+        this.composer.setPixelRatio(pixelRatio);
+        this.composer.setSize(width, height);
+    }
+
+    _disposePostProcessing() {
+        this.postPasses.forEach((pass) => {
+            if (typeof pass.dispose === 'function') pass.dispose();
+        });
+        this.postPasses = [];
+        if (this.composer) {
+            this.composer.dispose();
+            this.composer = null;
+        }
+    }
+
+    _shouldUsePostProcessing() {
+        return (
+            !!this.composer &&
+            !!this.renderer &&
+            this.renderer._rendererType === 'webgl' &&
+            !this.isXRPresenting
+        );
     }
 
     _addVRButton() {
@@ -192,6 +324,7 @@ class App {
         // Stop loop and dispose
         // IMPORTANT: Dispose environment first to avoid WebGPU dangling listener errors
         this.envManager.dispose();
+        this._disposePostProcessing();
         disposeRenderer(this.renderer);
 
         // Create new renderer
@@ -205,6 +338,7 @@ class App {
         // Restore controls and camera
         this.sceneManager.setupControls(this.renderer);
         this.sceneManager.restoreCameraState(cameraState);
+        this._setupPostProcessing();
 
         // Re-generate environment map for new renderer
         await this.envManager.setEnvironment(
@@ -233,6 +367,7 @@ class App {
 
                 this.renderer.toneMapping = THREE.NoToneMapping;
                 this.renderer.setPixelRatio(1);
+                this._resizePostProcessing();
 
                 // Offset spawn position so user starts in front of the bike
                 if (this.sceneManager.xrRig) {
@@ -245,6 +380,7 @@ class App {
                 this.uiManager.show();
                 this.statsManager.show();
                 this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this._resizePostProcessing();
 
                 // Restore tonemapping for Desktop
                 this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
