@@ -31,7 +31,7 @@ export class SceneManager {
         this.controls = null;
         this.autoRotate = false;
         this.clock = new THREE.Clock();
-
+//improvements
         // XR
         this.controllers = [];
         this.controllerGrips = [];
