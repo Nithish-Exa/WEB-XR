@@ -872,24 +872,24 @@ export class EnvironmentManager {
             color: 0xeaf5ff,
             intensity: 1.4,
         });
-        addReflectionDotGrid({
-            origin: [-0.25, 4.72, 0.55],
-            columns: 7,
-            rows: 4,
-            spacing: [0.28, 0.26],
-            radius: 0.078,
-            color: 0xffffff,
-            intensity: 17,
-        });
-        addReflectionDotGrid({
-            origin: [0.65, 4.58, -0.35],
-            columns: 5,
-            rows: 3,
-            spacing: [0.24, 0.24],
-            radius: 0.064,
-            color: 0xfff2d5,
-            intensity: 12,
-        });
+        // addReflectionDotGrid({
+        //     origin: [-0.25, 4.72, 0.55],
+        //     columns: 7,
+        //     rows: 4,
+        //     spacing: [0.28, 0.26],
+        //     radius: 0.078,
+        //     color: 0xffffff,
+        //     intensity: 17,
+        // });
+        // addReflectionDotGrid({
+        //     origin: [0.65, 4.58, -0.35],
+        //     columns: 5,
+        //     rows: 3,
+        //     spacing: [0.24, 0.24],
+        //     radius: 0.064,
+        //     color: 0xfff2d5,
+        //     intensity: 12,
+        // });
         addDisc({
             position: [-4.1, 1.65, 0.4],
             rotation: [0, Math.PI / 2, 0],
