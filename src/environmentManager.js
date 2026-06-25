@@ -45,15 +45,15 @@ export class EnvironmentManager {
         const tileTexture = this._createPolishedStoneFloorTexture();
         const floorGeo = new THREE.PlaneGeometry(18, 16);
         const floorMat = new THREE.MeshPhysicalMaterial({
-            color: 0x2b2c29,
+            color: 0x272825,
             map: tileTexture,
             bumpMap: tileTexture,
-            bumpScale: 0.016,
-            roughness: 0.24,
+            bumpScale: 0.022,
+            roughness: 0.3,
             metalness: 0.02,
-            clearcoat: 0.36,
-            clearcoatRoughness: 0.16,
-            envMapIntensity: 1.55,
+            clearcoat: 0.24,
+            clearcoatRoughness: 0.24,
+            envMapIntensity: 1.35,
         });
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
@@ -173,22 +173,22 @@ export class EnvironmentManager {
             position: [-2.4, 4.55, 1.75],
             target: [2.4, 3.05, -4.7],
             color: 0xfff0dc,
-            intensity: 22,
+            intensity: 14,
         });
         this._addWallWashLight({
             position: [2.1, 4.35, 1.25],
             target: [4.1, 2.85, -4.7],
             color: 0xe9f0ff,
-            intensity: 13,
+            intensity: 8,
         });
 
-        const frontFill = new THREE.PointLight(0xfff2df, 7, 9, 2);
+        const frontFill = new THREE.PointLight(0xfff2df, 3.4, 9, 2);
         frontFill.position.set(-2.8, 2.1, 3.2);
         frontFill.name = 'envLight_Aux';
         this.scene.add(frontFill);
         this.envObjects.push(frontFill);
 
-        const lowerWarmFill = new THREE.PointLight(0xffc880, 5, 7, 2);
+        const lowerWarmFill = new THREE.PointLight(0xffc880, 1.5, 7, 2);
         lowerWarmFill.position.set(-3.4, 0.65, 1.9);
         lowerWarmFill.name = 'envLight_Aux';
         this.scene.add(lowerWarmFill);
@@ -259,7 +259,7 @@ export class EnvironmentManager {
                     position: [x, row.y + (index % 2) * 0.08, row.z],
                     radius: pendantRadius,
                     color: index % 2 === 0 ? 0xfff1d2 : 0xffffff,
-                    intensity,
+                    intensity: intensity * 0.48,
                     target: [targetX, 0.62, row.targetZ],
                     castShadow,
                 });
@@ -499,11 +499,11 @@ export class EnvironmentManager {
             new THREE.MeshPhysicalMaterial({
                 color: 0x6a3e29,
                 map: woodTexture,
-                roughness: 0.32,
+                roughness: 0.38,
                 metalness: 0.02,
-                clearcoat: 0.42,
-                clearcoatRoughness: 0.22,
-                envMapIntensity: 1.35,
+                clearcoat: 0.34,
+                clearcoatRoughness: 0.28,
+                envMapIntensity: 1.25,
             })
         );
         platform.position.set(0, -0.08, 0);
@@ -531,7 +531,7 @@ export class EnvironmentManager {
         const stripMaterial = new THREE.MeshStandardMaterial({
             color: 0xfff6df,
             emissive: 0xffecd0,
-            emissiveIntensity: 5,
+            emissiveIntensity: 2.4,
             roughness: 0.18,
             metalness: 0,
             toneMapped: false,
@@ -631,6 +631,31 @@ export class EnvironmentManager {
                 ctx.fillStyle = `rgba(255,255,255,${alpha})`;
                 ctx.fillRect(x, y, Math.random() * 22 + 4, 1);
             }
+            for (let i = 0; i < 72; i += 1) {
+                const x = Math.random() * width;
+                const y = Math.random() * height;
+                const length = 18 + Math.random() * 80;
+                ctx.strokeStyle = `rgba(255,255,255,${0.025 + Math.random() * 0.035})`;
+                ctx.lineWidth = Math.random() > 0.75 ? 2 : 1;
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(x + length, y + Math.sin(x * 0.02) * 2);
+                ctx.stroke();
+            }
+            for (let i = 0; i < 38; i += 1) {
+                ctx.fillStyle = `rgba(0,0,0,${0.04 + Math.random() * 0.08})`;
+                ctx.beginPath();
+                ctx.ellipse(
+                    Math.random() * width,
+                    Math.random() * height,
+                    4 + Math.random() * 18,
+                    2 + Math.random() * 8,
+                    Math.random() * Math.PI,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+            }
             ctx.strokeStyle = '#0c0d0d';
             ctx.lineWidth = 4;
             for (let i = 0; i <= 4; i += 1) {
@@ -702,6 +727,32 @@ export class EnvironmentManager {
                 ctx.moveTo(0, y);
                 ctx.bezierCurveTo(130, y + wave, 330, y - wave, width, y + wave * 0.4);
                 ctx.stroke();
+            }
+            for (let i = 0; i < 90; i += 1) {
+                const x = Math.random() * width;
+                const y = Math.random() * height;
+                ctx.strokeStyle = Math.random() > 0.45
+                    ? 'rgba(255,220,170,0.08)'
+                    : 'rgba(28,10,5,0.12)';
+                ctx.lineWidth = Math.random() > 0.85 ? 2 : 1;
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(x + 18 + Math.random() * 120, y + Math.sin(y * 0.06) * 3);
+                ctx.stroke();
+            }
+            for (let i = 0; i < 18; i += 1) {
+                ctx.fillStyle = 'rgba(30, 12, 7, 0.16)';
+                ctx.beginPath();
+                ctx.ellipse(
+                    Math.random() * width,
+                    Math.random() * height,
+                    18 + Math.random() * 36,
+                    4 + Math.random() * 12,
+                    Math.random() * Math.PI,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
             }
         }, [2.4, 1.2]);
     }
@@ -879,7 +930,7 @@ export class EnvironmentManager {
         //     spacing: [0.28, 0.26],
         //     radius: 0.078,
         //     color: 0xffffff,
-        //     intensity: 17,
+        //     intensity: 16,
         // });
         // addReflectionDotGrid({
         //     origin: [0.65, 4.58, -0.35],
@@ -888,7 +939,7 @@ export class EnvironmentManager {
         //     spacing: [0.24, 0.24],
         //     radius: 0.064,
         //     color: 0xfff2d5,
-        //     intensity: 12,
+        //     intensity: 10,
         // });
         addDisc({
             position: [-4.1, 1.65, 0.4],
@@ -905,9 +956,9 @@ export class EnvironmentManager {
             intensity: 1.4,
         });
 
-        const envMap = this.pmremGenerator.fromScene(reflectionScene, 0.014).texture;
+        const envMap = this.pmremGenerator.fromScene(reflectionScene, 0.01).texture;
         this.scene.environment = envMap;
-        this.scene.environmentIntensity = 1.02;
+        this.scene.environmentIntensity = 1.18;
 
         reflectionScene.traverse((obj) => {
             if (obj.geometry) obj.geometry.dispose();

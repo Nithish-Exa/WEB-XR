@@ -67,7 +67,7 @@ function applyProductionSettings(renderer) {
     renderer.setPixelRatio(pr);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.7;
+    renderer.toneMappingExposure = 1.0;
     if ('useLegacyLights' in renderer) {
         renderer.useLegacyLights = false;
     }

@@ -18,8 +18,8 @@ const isMobileDevice = () =>
 export class SceneManager {
     constructor() {
         this.scene = new THREE.Scene();
-        this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 500);
-        this.camera.position.set(-3.65, 1.55, 4.35);
+        this.camera = new THREE.PerspectiveCamera(40, 1, 0.1, 500);
+        this.camera.position.set(-3.25, 1.34, 3.85);
 
         // XR Rig for proper positioning and teleportation
         this.xrRig = new THREE.Group();
@@ -49,19 +49,19 @@ export class SceneManager {
     }
 
     _setupLighting() {
-        const hemi = new THREE.HemisphereLight(0xe9f2ff, 0x181512, 0.24);
+        const hemi = new THREE.HemisphereLight(0xe9f2ff, 0x181512, 0.16);
         hemi.name = 'defaultAmbient';
         this.scene.add(hemi);
 
-        const ambientLift = new THREE.AmbientLight(0xfff6e8, 0.025);
+        const ambientLift = new THREE.AmbientLight(0xfff6e8, 0.012);
         ambientLift.name = 'ambientLift';
         this.scene.add(ambientLift);
 
         const shadowRes = isMobileDevice() ? 1024 : 2048;
 
-        const key = new THREE.DirectionalLight(0xfff8ed, 0.95);
+        const key = new THREE.DirectionalLight(0xfff4df, 1.85);
         key.name = 'defaultKey';
-        key.position.set(-3.7, 6.2, 3.35);
+        key.position.set(-3.8, 5.8, 3.2);
         key.castShadow = true;
         key.shadow.mapSize.set(shadowRes, shadowRes);
         key.shadow.camera.near = 0.5;
@@ -72,29 +72,29 @@ export class SceneManager {
         key.shadow.camera.bottom = -10;
         key.shadow.bias = -0.00008;
         key.shadow.normalBias = 0.025;
-        key.shadow.radius = 5;
+        key.shadow.radius = 7;
         key.target.position.set(0, 0.8, 0);
         this.scene.add(key);
         this.scene.add(key.target);
 
-        const fill = new THREE.DirectionalLight(0xbcd7ff, 0.24);
+        const fill = new THREE.DirectionalLight(0xc7dcff, 0.48);
         fill.name = 'defaultFill';
         fill.position.set(4, 4, -3);
         fill.target.position.set(0, 0.8, 0);
         this.scene.add(fill);
         this.scene.add(fill.target);
 
-        const rim = new THREE.DirectionalLight(0xffe1bd, 0.82);
+        const rim = new THREE.DirectionalLight(0xffdfb2, 0.82);
         rim.name = 'defaultRim';
-        rim.position.set(-4.5, 3.5, -5);
+        rim.position.set(3.4, 3.1, -4.8);
         rim.target.position.set(0, 0.7, 0);
         this.scene.add(rim);
         this.scene.add(rim.target);
 
         const topLights = [
-            { position: [-1.9, 4.75, 1.55], intensity: 10, color: 0xfff2dc, angle: 0.46 },
-            { position: [0.35, 5.05, 0.2], intensity: 14, color: 0xffffff, angle: 0.5 },
-            { position: [2.45, 4.55, -1.45], intensity: 8, color: 0xe3ecff, angle: 0.48 },
+            { position: [-1.9, 4.75, 1.55], intensity: 8, color: 0xfff2dc, angle: 0.46 },
+            { position: [0.35, 5.05, 0.2], intensity: 10, color: 0xffffff, angle: 0.5 },
+            { position: [2.45, 4.55, -1.45], intensity: 6, color: 0xe3ecff, angle: 0.48 },
         ];
 
         topLights.forEach((cfg, index) => {
@@ -207,11 +207,11 @@ export class SceneManager {
     _setPresentationCamera() {
         const aspect = window.innerWidth / Math.max(window.innerHeight, 1);
         if (aspect < 0.8) {
-            this.camera.position.set(-4.75, 1.95, 5.65);
+            this.camera.position.set(-4.35, 1.8, 5.05);
             return;
         }
 
-        this.camera.position.set(-3.65, 1.55, 4.35);
+        this.camera.position.set(-3.25, 1.34, 3.85);
     }
 
     _polishMaterial(material, meshName = '') {
@@ -280,8 +280,8 @@ export class SceneManager {
                 polished.envMapIntensity = Math.max(polished.envMapIntensity, 2.7);
             } else if (looksPaint) {
                 if (texturedPaint) {
-                    polished.roughness = Math.min(polished.roughness ?? 0.28, 0.28);
-                    polished.envMapIntensity = Math.max(polished.envMapIntensity, 2.08);
+                    polished.roughness = Math.min(polished.roughness ?? 0.22, 0.22);
+                    polished.envMapIntensity = Math.max(polished.envMapIntensity, 2.35);
                 } else {
                     polished.metalness = THREE.MathUtils.clamp(polished.metalness ?? 0.08, 0.02, 0.14);
                     polished.roughness = THREE.MathUtils.clamp(polished.roughness ?? 0.22, 0.18, 0.3);
@@ -293,7 +293,7 @@ export class SceneManager {
                 polished.clearcoat = 0.92;
                 polished.clearcoatRoughness = 0.08;
                 polished.ior = 1.55;
-                polished.reflectivity = 0.78;
+                polished.reflectivity = 0.0;
                 polished.specularIntensity = 1;
             }
         }
