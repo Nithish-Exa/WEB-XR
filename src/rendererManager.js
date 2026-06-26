@@ -67,14 +67,14 @@ function applyProductionSettings(renderer) {
     renderer.setPixelRatio(pr);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMappingExposure = 1.12;
     if ('useLegacyLights' in renderer) {
         renderer.useLegacyLights = false;
     }
 
     if (renderer.shadowMap) {
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.VSMShadowMap;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     }
 }
 
