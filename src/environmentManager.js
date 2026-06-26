@@ -84,14 +84,14 @@ export class EnvironmentManager {
       map: wallMaps.map,
       normalMap: wallMaps.normalMap,
       normalScale: new THREE.Vector2(0.14, 0.14),
-      roughnessMap: wallMaps.roughnessMap,
+      //roughnessMap: wallMaps.roughnessMap,
       aoMap: wallMaps.aoMap,
       displacementMap: wallMaps.heightMap,
       displacementScale: 0.0025,
       displacementBias: -0.001,
-      roughness: 0.98,
+      roughness: 1,
       metalness: 0,
-      envMapIntensity: 0.08,
+      envMapIntensity: 0,
     });
 
     const backWallGeo = new THREE.PlaneGeometry(16, 7, 192, 96);
@@ -151,7 +151,7 @@ export class EnvironmentManager {
     this.scene.add(baseboard);
     this.envObjects.push(baseboard);
 
-    this._addDisplayPlatform();
+        await this._addDisplayPlatform();
     this._addPoster({
       position: [-2.05, 3.65, -4.68],
       size: [0.85, 1.12],
@@ -168,6 +168,7 @@ export class EnvironmentManager {
     });
 
     this._addPendantLightGrid();
+    this._addBackWallAccentLights();
     this._addWallWashLight({
       position: [-2.4, 4.55, 1.75],
       target: [2.4, 3.05, -4.7],
@@ -207,6 +208,20 @@ export class EnvironmentManager {
 
     this.scene.background = new THREE.Color(0x1d1f20);
     this.scene.fog = new THREE.Fog(0x1d1f20, 15, 34);
+  }
+
+  _addBackWallAccentLights() {
+    const sconceXs = [-3.3, 0, 3.3];
+    sconceXs.forEach((x, index) => {
+      this._addWallSconce({
+        name: `backWallSconce_${index + 1}`,
+        position: [x, 4.56, -4.54],
+        target: [x, 1.58, -4.78],
+        color: 0xfff0d8,
+        intensity: index === 1 ? 18 : 15.5,
+        radius: 0.155,
+      });
+    });
   }
 
   _addPendantLightGrid() {
@@ -508,24 +523,97 @@ export class EnvironmentManager {
     this.envObjects.push(spot, spot.target);
   }
 
-  _addDisplayPlatform() {
-    const platformMaps = this._createDisplayPlatformWoodMaps();
+  _addWallSconce({ name, position, target, color, intensity, radius = 0.15 }) {
+    const lightColor = new THREE.Color(color);
+
+    const canopy = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius * 0.7, radius * 0.7, 0.08, 32),
+      new THREE.MeshStandardMaterial({
+        color: 0x141414,
+        roughness: 0.3,
+        metalness: 0.82,
+        envMapIntensity: 1.3,
+      }),
+    );
+    canopy.name = `${name}_canopy`;
+    canopy.position.set(position[0], position[1], position[2] + 0.03);
+    canopy.rotation.x = Math.PI / 2;
+    this.scene.add(canopy);
+    this.envObjects.push(canopy);
+
+    const trim = new THREE.Mesh(
+      new THREE.TorusGeometry(radius * 0.78, radius * 0.08, 14, 48),
+      new THREE.MeshStandardMaterial({
+        color: 0xd7d0c2,
+        roughness: 0.18,
+        metalness: 0.88,
+        envMapIntensity: 1.6,
+      }),
+    );
+    trim.name = `${name}_trim`;
+    trim.position.set(position[0], position[1], position[2] + 0.026);
+    this.scene.add(trim);
+    this.envObjects.push(trim);
+
+    const lens = new THREE.Mesh(
+      new THREE.CircleGeometry(radius * 0.56, 40),
+      new THREE.MeshBasicMaterial({
+        color: lightColor.clone().multiplyScalar(1.18),
+        transparent: true,
+        opacity: 0.94,
+        toneMapped: true,
+      }),
+    );
+    lens.name = `${name}_lens`;
+    lens.position.set(position[0], position[1], position[2] + 0.04);
+    this.scene.add(lens);
+    this.envObjects.push(lens);
+
+    const glow = new THREE.Mesh(
+      new THREE.CircleGeometry(radius * 1.35, 48),
+      new THREE.MeshBasicMaterial({
+        color: lightColor,
+        transparent: true,
+        opacity: 0.14,
+        depthWrite: false,
+        toneMapped: true,
+      }),
+    );
+    glow.name = `${name}_glow`;
+    glow.position.set(position[0], position[1], position[2] + 0.035);
+    glow.renderOrder = 3;
+    this.scene.add(glow);
+    this.envObjects.push(glow);
+
+    const spot = new THREE.SpotLight(color, intensity, 7.5, 0.5, 0.82, 2);
+    spot.name = `${name}_spot`;
+    spot.position.set(position[0], position[1], position[2] + 0.12);
+    spot.target.position.set(...target);
+    spot.castShadow = false;
+    this.scene.add(spot);
+    this.scene.add(spot.target);
+    this.envObjects.push(spot, spot.target);
+  }
+
+  async _addDisplayPlatform() {
+    const platformMaps = await this._createDisplayPlatformWoodMaps();
     const platformGeo = new THREE.BoxGeometry(4.7, 0.16, 2.4, 16, 2, 8);
     this._applyUv2(platformGeo);
     const platform = new THREE.Mesh(
       platformGeo,
       new THREE.MeshPhysicalMaterial({
-        color: 0xffffff,
+        color: 0x7f7f7f,
         map: platformMaps.map,
         normalMap: platformMaps.normalMap,
-        normalScale: new THREE.Vector2(0.3, 0.3),
+        normalScale: new THREE.Vector2(1, 1),
         roughnessMap: platformMaps.roughnessMap,
         aoMap: platformMaps.aoMap,
+        metalnessMap: platformMaps.metalnessMap,
         roughness: 0.42,
         metalness: 0.02,
         clearcoat: 0.34,
         clearcoatRoughness: 0.28,
-        envMapIntensity: 1.45,
+        envMapIntensity: 0.45,
       }),
     );
     platform.position.set(0, -0.08, 0);
@@ -608,6 +696,8 @@ export class EnvironmentManager {
       color: 0xffffff,
       map: platformMaps.map,
       normalMap: platformMaps.normalMap,
+      aoMap: platformMaps.aoMap,
+      metalnessMap: platformMaps.metalnessMap,
       roughnessMap: platformMaps.roughnessMap,
       roughness: 0.5,
       metalness: 0.03,
@@ -1609,130 +1699,24 @@ export class EnvironmentManager {
     };
   }
 
-  _createDisplayPlatformWoodMaps() {
-    const width = 768;
-    const height = 512;
+  async _createDisplayPlatformWoodMaps() {
     const repeat = [1.55, 1.05];
+    const [map, armMap, normalMap] = await Promise.all([
+      this.textureLoader.loadAsync("/Textures/wood_floor_worn_diff_1k.jpg"),
+      this.textureLoader.loadAsync("/Textures/wood_floor_worn_arm_1k.jpg"),
+      this.textureLoader.loadAsync("/Textures/wood_floor_worn_nor_gl_1k.jpg"),
+    ]);
 
-    const drawWood = (ctx, surface) => {
-      const isAlbedo = surface === "albedo";
-      const isHeight = surface === "height";
-      const isRoughness = surface === "roughness";
-      const isAo = surface === "ao";
-
-      ctx.fillStyle = isAlbedo
-        ? "#6b3a1f"
-        : isHeight
-          ? "#818181"
-          : isRoughness
-            ? "#8d8d8d"
-            : "#eeeeee";
-      ctx.fillRect(0, 0, width, height);
-
-      for (let y = 0; y < height; y += 10) {
-        const wave = Math.sin(y * 0.08) * 11;
-        if (isAlbedo) {
-          ctx.strokeStyle =
-            y % 40 === 0
-              ? "rgba(30, 10, 3, 0.32)"
-              : "rgba(255, 188, 112, 0.15)";
-          ctx.lineWidth = y % 40 === 0 ? 3 : 1;
-        } else if (isHeight) {
-          ctx.strokeStyle =
-            y % 40 === 0 ? "rgba(0,0,0,0.14)" : "rgba(255,255,255,0.07)";
-          ctx.lineWidth = y % 40 === 0 ? 2 : 1;
-        } else if (isRoughness) {
-          ctx.strokeStyle =
-            y % 30 === 0 ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
-          ctx.lineWidth = 1;
-        } else {
-          ctx.strokeStyle = "rgba(0,0,0,0.045)";
-          ctx.lineWidth = 1;
-        }
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.bezierCurveTo(150, y + wave, 395, y - wave, width, y + wave * 0.45);
-        ctx.stroke();
-      }
-
-      for (let i = 0; i < 55; i += 1) {
-        const x = this._hash(i * 23.4) * width;
-        const y = this._hash(i * 41.9) * height;
-        const length = 24 + this._hash(i * 5.7) * 150;
-        ctx.strokeStyle = isAlbedo
-          ? i % 2
-            ? "rgba(255,214,158,0.08)"
-            : "rgba(26,8,3,0.16)"
-          : isHeight
-            ? i % 2
-              ? "rgba(255,255,255,0.055)"
-              : "rgba(0,0,0,0.075)"
-            : "rgba(0,0,0,0.04)";
-        ctx.lineWidth = this._hash(i) > 0.84 ? 2 : 1;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + length, y + Math.sin(y * 0.05) * 3);
-        ctx.stroke();
-      }
-
-      for (let i = 0; i < 12; i += 1) {
-        ctx.fillStyle = isRoughness
-          ? "rgba(255,255,255,0.12)"
-          : isAo
-            ? "rgba(0,0,0,0.18)"
-            : "rgba(28, 10, 4, 0.18)";
-        ctx.beginPath();
-        ctx.ellipse(
-          this._hash(i * 19.7) * width,
-          this._hash(i * 29.1) * height,
-          18 + this._hash(i) * 34,
-          4 + this._hash(i + 4) * 9,
-          this._hash(i * 2.3) * Math.PI,
-          0,
-          Math.PI * 2,
-        );
-        ctx.fill();
-      }
-    };
-
-    const albedoCanvas = this._drawCanvas(width, height, (ctx) =>
-      drawWood(ctx, "albedo"),
-    );
-    const heightCanvas = this._drawCanvas(width, height, (ctx) =>
-      drawWood(ctx, "height"),
-    );
-    const roughnessCanvas = this._drawCanvas(width, height, (ctx) =>
-      drawWood(ctx, "roughness"),
-    );
-    const aoCanvas = this._drawCanvas(width, height, (ctx) =>
-      drawWood(ctx, "ao"),
-    );
+    this._prepareLoadedTexture(map, repeat, THREE.SRGBColorSpace, true);
+    this._prepareLoadedTexture(armMap, repeat, THREE.NoColorSpace, true);
+    this._prepareLoadedTexture(normalMap, repeat, THREE.NoColorSpace, true);
 
     return {
-      map: this._textureFromCanvas(
-        albedoCanvas,
-        repeat,
-        THREE.SRGBColorSpace,
-        10,
-      ),
-      heightMap: this._textureFromCanvas(
-        heightCanvas,
-        repeat,
-        THREE.NoColorSpace,
-        10,
-      ),
-      normalMap: this._createNormalMapFromHeightCanvas(
-        heightCanvas,
-        1.8,
-        repeat,
-      ),
-      roughnessMap: this._textureFromCanvas(
-        roughnessCanvas,
-        repeat,
-        THREE.NoColorSpace,
-        10,
-      ),
-      aoMap: this._textureFromCanvas(aoCanvas, repeat, THREE.NoColorSpace, 10),
+      map,
+      normalMap,
+      roughnessMap: armMap,
+      aoMap: armMap,
+      metalnessMap: armMap,
     };
   }
 
@@ -2002,24 +1986,24 @@ export class EnvironmentManager {
       color: 0xffead0,
       intensity: 1.32,
     });
-    addReflectionDotGrid({
-      origin: [-0.42, 4.73, 0.66],
-      columns: 9,
-      rows: 3,
-      spacing: [0.22, 0.2],
-      radius: 0.032,
-      color: 0xffffff,
-      intensity: 6.2,
-    });
-    addReflectionDotGrid({
-      origin: [0.72, 4.6, -0.28],
-      columns: 7,
-      rows: 2,
-      spacing: [0.2, 0.18],
-      radius: 0.026,
-      color: 0xfff0d8,
-      intensity: 5.1,
-    });
+    // addReflectionDotGrid({
+    //   origin: [-0.42, 4.73, 0.66],
+    //   columns: 9,
+    //   rows: 3,
+    //   spacing: [0.22, 0.2],
+    //   radius: 0.032,
+    //   color: 0xffffff,
+    //   intensity: 6.2,
+    // });
+    // addReflectionDotGrid({
+    //   origin: [0.72, 4.6, -0.28],
+    //   columns: 7,
+    //   rows: 2,
+    //   spacing: [0.2, 0.18],
+    //   radius: 0.026,
+    //   color: 0xfff0d8,
+    //   intensity: 5.1,
+    // });
     [
       {
         position: [-0.78, 4.68, 0.42],

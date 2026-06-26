@@ -163,6 +163,7 @@ export class SceneManager {
             model.position.y - scaledBox.min.y,
             model.position.z - scaledCenter.z
         );
+        model.rotation.y += Math.PI / 2;
 
         // Preserve product-render depth while skipping tiny shadow casters.
         model.traverse((child) => {
