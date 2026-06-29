@@ -26,10 +26,10 @@ import { StatsManager } from './statsManager.js';
 const ColorGradeShader = {
     uniforms: {
         tDiffuse: { value: null },
-        contrast: { value: 1.05 },
-        saturation: { value: 1.03 },
-        vignetteStrength: { value: 0.12 },
-        vignetteRadius: { value: 0.78 },
+        contrast: { value: 1.03 },
+        saturation: { value: 1.05 },
+        vignetteStrength: { value: 0.055 },
+        vignetteRadius: { value: 0.84 },
     },
     vertexShader: `
         varying vec2 vUv;
@@ -236,9 +236,9 @@ class App {
 
         const bloomPass = new UnrealBloomPass(
             new THREE.Vector2(width, height),
-            0.065,
-            0.32,
-            0.92
+            0.035,
+            0.24,
+            1.12
         );
 
         const colorGradePass = new ShaderPass(ColorGradeShader);

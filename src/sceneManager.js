@@ -49,17 +49,17 @@ export class SceneManager {
     }
 
     _setupLighting() {
-        const hemi = new THREE.HemisphereLight(0xe9f2ff, 0x181512, 0.16);
+        const hemi = new THREE.HemisphereLight(0xf2f6ff, 0x241b14, 0.22);
         hemi.name = 'defaultAmbient';
         this.scene.add(hemi);
 
-        const ambientLift = new THREE.AmbientLight(0xfff6e8, 0.012);
+        const ambientLift = new THREE.AmbientLight(0xfff6e8, 0.05);
         ambientLift.name = 'ambientLift';
         this.scene.add(ambientLift);
 
         const shadowRes = isMobileDevice() ? 1024 : 2048;
 
-        const key = new THREE.DirectionalLight(0xfff4df, 1.85);
+        const key = new THREE.DirectionalLight(0xfff4df, 1.72);
         key.name = 'defaultKey';
         key.position.set(-3.8, 5.8, 3.2);
         key.castShadow = true;
@@ -77,14 +77,14 @@ export class SceneManager {
         this.scene.add(key);
         this.scene.add(key.target);
 
-        const fill = new THREE.DirectionalLight(0xc7dcff, 0.48);
+        const fill = new THREE.DirectionalLight(0xc7dcff, 0.56);
         fill.name = 'defaultFill';
         fill.position.set(4, 4, -3);
         fill.target.position.set(0, 0.8, 0);
         this.scene.add(fill);
         this.scene.add(fill.target);
 
-        const rim = new THREE.DirectionalLight(0xffdfb2, 0.82);
+        const rim = new THREE.DirectionalLight(0xffdfb2, 0.72);
         rim.name = 'defaultRim';
         rim.position.set(3.4, 3.1, -4.8);
         rim.target.position.set(0, 0.7, 0);
@@ -92,9 +92,9 @@ export class SceneManager {
         this.scene.add(rim.target);
 
         const topLights = [
-            { position: [-1.9, 4.75, 1.55], intensity: 8, color: 0xfff2dc, angle: 0.46 },
-            { position: [0.35, 5.05, 0.2], intensity: 10, color: 0xffffff, angle: 0.5 },
-            { position: [2.45, 4.55, -1.45], intensity: 6, color: 0xe3ecff, angle: 0.48 },
+            { position: [-1.9, 4.75, 1.55], intensity: 8.5, color: 0xfff2dc, angle: 0.46 },
+            { position: [0.35, 5.05, 0.2], intensity: 10.8, color: 0xffffff, angle: 0.5 },
+            { position: [2.45, 4.55, -1.45], intensity: 6.5, color: 0xe3ecff, angle: 0.48 },
         ];
 
         topLights.forEach((cfg, index) => {
@@ -163,6 +163,7 @@ export class SceneManager {
             model.position.y - scaledBox.min.y,
             model.position.z - scaledCenter.z
         );
+        model.rotation.y += Math.PI / 2;
 
         // Preserve product-render depth while skipping tiny shadow casters.
         model.traverse((child) => {
@@ -178,6 +179,10 @@ export class SceneManager {
                 if (child.geometry && !child.geometry.attributes.normal) {
                     child.geometry.computeVertexNormals();
                 }
+                if (typeof child.geometry?.normalizeNormals === 'function') {
+                    child.geometry.normalizeNormals();
+                }
+                child.geometry?.computeBoundingSphere?.();
 
                 // Ensure proper material settings
                 if (child.material) {
@@ -225,8 +230,10 @@ export class SceneManager {
 
         if (polished.isMeshStandardMaterial || polished.isMeshPhysicalMaterial) {
             const name = `${polished.name || ''} ${meshName}`.toLowerCase();
+            const looksHelperTransparency = /transparency|transparencey/.test(name);
             const looksRubber = /rubber|tyre|tire|grip|seat|leather|saddle/.test(name);
             const looksGlass = /glass|screen|lens|visor|windshield/.test(name);
+            const looksEmitter = /headlight|tail|brake|indicator|turn|lamp|light|led|bulb/.test(name);
             const looksPaint =
                 /main_body|paint|body|tank|fuel|panel|cover|fairing|fender|mudguard|cowl|red|yellow|blue|white|black/.test(name) &&
                 !/pad|bag|sticker|graphics|logo|rubber|tyre|tire|seat|leather|saddle|engine|brake|disc|screw|muffler|fork|rim|lever|reservoir|caliper/.test(name);
@@ -265,7 +272,29 @@ export class SceneManager {
                 polished = physicalPaint;
             }
 
-            polished.envMapIntensity = Math.max(polished.envMapIntensity ?? 1, looksPaint ? 1.95 : 1.65);
+            this._prepareMaterialTextures(polished);
+
+            polished.dithering = true;
+            polished.toneMapped = true;
+
+            if (looksHelperTransparency) {
+                if (polished.color) polished.color.set(0x000000);
+                if (polished.emissive) polished.emissive.set(0x000000);
+                polished.emissiveIntensity = 0;
+                polished.transparent = true;
+                polished.opacity = 0;
+                polished.depthWrite = false;
+                polished.depthTest = true;
+                polished.colorWrite = false;
+                polished.metalness = 0;
+                polished.roughness = 1;
+                polished.envMapIntensity = 0;
+                polished.needsUpdate = true;
+                this.polishedMaterialCache.set(material.uuid, polished);
+                return polished;
+            }
+
+            polished.envMapIntensity = Math.max(polished.envMapIntensity ?? 1, looksPaint ? 1.55 : 1.35);
 
             if (looksRubber) {
                 polished.metalness = Math.min(polished.metalness ?? 0, 0.08);
@@ -273,34 +302,66 @@ export class SceneManager {
                 polished.envMapIntensity = Math.min(polished.envMapIntensity, 0.9);
             } else if (looksGlass) {
                 polished.roughness = Math.min(polished.roughness ?? 0.12, 0.16);
-                polished.envMapIntensity = 2.1;
+                polished.envMapIntensity = 1.65;
             } else if (looksMetal) {
                 polished.metalness = Math.max(polished.metalness ?? 0, 0.82);
-                polished.roughness = THREE.MathUtils.clamp(polished.roughness ?? 0.28, 0.13, 0.34);
-                polished.envMapIntensity = Math.max(polished.envMapIntensity, 2.7);
+                polished.roughness = THREE.MathUtils.clamp(polished.roughness ?? 0.32, 0.22, 0.46);
+                polished.envMapIntensity = THREE.MathUtils.clamp(polished.envMapIntensity, 1.25, 1.95);
             } else if (looksPaint) {
                 if (texturedPaint) {
-                    polished.roughness = Math.min(polished.roughness ?? 0.22, 0.22);
-                    polished.envMapIntensity = Math.max(polished.envMapIntensity, 2.35);
+                    polished.roughness = THREE.MathUtils.clamp(polished.roughness ?? 0.24, 0.2, 0.32);
+                    polished.envMapIntensity = THREE.MathUtils.clamp(polished.envMapIntensity, 1.55, 2.05);
                 } else {
                     polished.metalness = THREE.MathUtils.clamp(polished.metalness ?? 0.08, 0.02, 0.14);
-                    polished.roughness = THREE.MathUtils.clamp(polished.roughness ?? 0.22, 0.18, 0.3);
-                    polished.envMapIntensity = Math.max(polished.envMapIntensity, 1.75);
+                    polished.roughness = THREE.MathUtils.clamp(polished.roughness ?? 0.24, 0.2, 0.34);
+                    polished.envMapIntensity = THREE.MathUtils.clamp(polished.envMapIntensity, 1.48, 1.9);
                 }
             }
 
             if ('clearcoat' in polished && looksPaint) {
-                polished.clearcoat = 0.92;
-                polished.clearcoatRoughness = 0.08;
+                polished.clearcoat = 0.86;
+                polished.clearcoatRoughness = 0.1;
                 polished.ior = 1.55;
                 polished.reflectivity = 0.0;
-                polished.specularIntensity = 1;
+                polished.specularIntensity = 0.9;
+            }
+
+            if (polished.emissive && polished.emissiveIntensity > 0) {
+                polished.emissiveIntensity = looksEmitter
+                    ? Math.min(polished.emissiveIntensity, 1.15)
+                    : Math.min(polished.emissiveIntensity, 0.28);
             }
         }
 
         polished.needsUpdate = true;
         this.polishedMaterialCache.set(material.uuid, polished);
         return polished;
+    }
+
+    _prepareMaterialTextures(material) {
+        const textureKeys = [
+            'map',
+            'emissiveMap',
+            'aoMap',
+            'roughnessMap',
+            'metalnessMap',
+            'normalMap',
+            'bumpMap',
+            'alphaMap',
+        ];
+
+        textureKeys.forEach((key) => {
+            const texture = material[key];
+            if (!texture?.isTexture) return;
+
+            texture.anisotropy = Math.max(texture.anisotropy ?? 1, 8);
+            texture.minFilter = THREE.LinearMipmapLinearFilter;
+            texture.magFilter = THREE.LinearFilter;
+            if (key === 'map' || key === 'emissiveMap') {
+                texture.colorSpace = THREE.SRGBColorSpace;
+            }
+            texture.needsUpdate = true;
+        });
     }
 
     _updateShadowFrustum(box) {
